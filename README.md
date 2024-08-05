@@ -11,6 +11,14 @@ The reason I made this mod is that many players want the ability to disable mech
 - Enable or disable mechanoid raids and incidents with a single toggle.
 - Adjust the frequency of mechanoid encounters using a simple slider in the mod settings.
 - Settings can be configured mid-game, instantly applying changes to mechanoid activity.
+- **Easier Mechanoids Option**:
+  - **Reduced Health**: Mechanoids' health is reduced by 2.
+  - **Reduced Armor**: Both sharp and blunt armor ratings of mechanoids are reduced by 2.
+  - **Reduced Damage**: Melee damage dealt by mechanoids is reduced by 2.
+  - **Increased Cooldown**: Melee attack cooldown of mechanoids is increased by 2.
+  - **Flammability**: Mechanoids are now flammable, while their buildings (except turrets) remain non-flammable.
+  - **Reduced Turret Range**: The range of mechanoid turrets is reduced.
+  - **Reduced Shield Generator Range**: The effective range of mechanoid shield generators is reduced.
 
 ## Installation
 
@@ -22,7 +30,8 @@ The reason I made this mod is that many players want the ability to disable mech
 1. Go to the mod settings in the main menu or in-game.
 2. Use the checkbox to enable or disable mechanoids entirely.
 3. Use the slider to set the desired frequency of mechanoid encounters from 0% (no mechanoids) to 200% (double frequency).
-4. The mod will automatically adjust the mechanoid incidents based on your settings.
+4. Toggle the "Easier Mechanoids" option to enable or disable the easier mechanoids features.
+5. The mod will automatically adjust the mechanoid incidents based on your settings.
 
 ## Compatibility
 
