@@ -2,23 +2,22 @@
 
 ## Description
 
-**Mechanoid Manager** is a quality-of-life mod that provides you with full control over mechanoid raids and incidents. Easily enable or disable mechanoids, and adjust the frequency of mechanoid encounters to suit your gameplay style.
+**Mechanoid Manager** is a quality-of-life RimWorld mod that gives you direct control over mechanoid threats during an ongoing game. You can disable mechanoid raids and clusters, adjust the frequency of mechanoid encounters, remove live hostile mechs from the current map, and make hostile mechanoids significantly easier to deal with.
 
-The reason I made this mod is that many players want the ability to disable mechanoids mid-game. While you can disable mechanoids before starting a new game, there is no way to do so during an ongoing game. This mod allows you to disable mechanoids or modify their frequency mid-save.
+The reason I made this mod is that many players want control over mech threats mid-save without needing to restart or rely on dev tools. This mod allows you to change mechanoid behaviour during an active game and apply those changes immediately.
+
+> RimWorld 1.5 is no longer supported due to maintenance complexity. This mod is now focused on RimWorld 1.6.
 
 ## Features
 
-- Enable or disable mechanoid raids and incidents with a single toggle.
+- Enable or disable mechanoid raids and mechanoid threat incidents with a single toggle.
 - Adjust the frequency of mechanoid encounters using a simple slider in the mod settings.
-- Settings can be configured mid-game, instantly applying changes to mechanoid activity.
+- Settings can be configured mid-game and applied during an active save.
+- Remove live hostile mechs from the current map with a single button press.
 - **Easier Mechanoids Option**:
-  - **Reduced Health**: Mechanoids' health is reduced by 2.
-  - **Reduced Armor**: Both sharp and blunt armor ratings of mechanoids are reduced by 2.
-  - **Reduced Damage**: Melee damage dealt by mechanoids is reduced by 2.
-  - **Increased Cooldown**: Melee attack cooldown of mechanoids is increased by 2.
-  - **Flammability**: Mechanoids are now flammable, while their buildings (except turrets) remain non-flammable.
-  - **Reduced Turret Range**: The range of mechanoid turrets is reduced.
-  - **Reduced Shield Generator Range**: The effective range of mechanoid shield generators is reduced.
+  - **Weaker Mechanoids**: Hostile mechanoid pawns are heavily weakened while the option is enabled.
+  - **Weaker Mech Structures**: Mechanoid turrets, walls, and other mech structures are reduced to much lower hit points.
+  - **Live Application**: Newly spawned hostile mechanoid threats are also affected while the option is active.
 
 ## Installation
 
@@ -28,14 +27,14 @@ The reason I made this mod is that many players want the ability to disable mech
 ## How to Use
 
 1. Go to the mod settings in the main menu or in-game.
-2. Use the checkbox to enable or disable mechanoids entirely.
-3. Use the slider to set the desired frequency of mechanoid encounters from 0% (no mechanoids) to 200% (double frequency).
-4. Toggle the "Easier Mechanoids" option to enable or disable the easier mechanoids features.
-5. The mod will automatically adjust the mechanoid incidents based on your settings.
+2. Use the checkbox to enable or disable mechanoid threats entirely.
+3. Use the slider to set the desired frequency of mechanoid encounters from 0% to 200%.
+4. Toggle the **Easier Mechanoids** option to make hostile mechanoid pawns and structures much easier to destroy.
+5. Use the **Remove live hostile mechs now** button if you want to immediately clear hostile mechanoid threats already on the map.
 
 ## Compatibility
 
-This mod should be compatible with most other mods. If you encounter any issues, please report them.
+This mod is designed to be lightweight and should be compatible with most other mods. If you encounter any issues, please report them.
 
 ## Feedback
 
