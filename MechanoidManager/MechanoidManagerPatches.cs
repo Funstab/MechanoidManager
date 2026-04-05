@@ -1,6 +1,8 @@
-﻿using HarmonyLib;
-using RimWorld;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using HarmonyLib;
+using RimWorld;
 using Verse;
 
 namespace MechanoidManager
@@ -15,15 +17,324 @@ namespace MechanoidManager
         }
     }
 
+    public class MechanoidManagerGameComponent : GameComponent
+    {
+        private int nextRefreshTick;
+        private bool pendingApply;
+
+        public MechanoidManagerGameComponent(Game game)
+        {
+        }
+
+        public override void GameComponentTick()
+        {
+            if (Current.Game == null || Find.TickManager == null)
+            {
+                return;
+            }
+
+            var settings = MechanoidManagerRuntime.Settings;
+            if (settings == null)
+            {
+                return;
+            }
+
+            var currentTick = Find.TickManager.TicksGame;
+
+            if (pendingApply)
+            {
+                pendingApply = false;
+                nextRefreshTick = currentTick + 5;
+            }
+
+            if (!settings.easierMechanoids)
+            {
+                return;
+            }
+
+            if (currentTick < nextRefreshTick)
+            {
+                return;
+            }
+
+            nextRefreshTick = currentTick + 30;
+            MechanoidManagerRuntime.ApplyEasierMechanoidStateNow();
+        }
+
+        public void RequestApply()
+        {
+            pendingApply = true;
+        }
+    }
+
+    internal static class MechanoidManagerRuntime
+    {
+        internal const int MechStructureTargetHitPoints = 45;
+        internal const float EasierMechDamageMultiplier = 4f;
+
+        internal static MechanoidManagerSettings Settings => MechanoidManagerMod.Settings;
+
+        private static MechanoidManagerGameComponent Component => Current.Game?.GetComponent<MechanoidManagerGameComponent>();
+
+        internal static bool IsMechanoidFaction(Faction faction)
+        {
+            return faction != null && faction.def != null && faction.def.defName == "Mechanoid";
+        }
+
+        internal static bool IsHostileToPlayer(Faction faction)
+        {
+            return faction != null && Faction.OfPlayer != null && faction.HostileTo(Faction.OfPlayer);
+        }
+
+        internal static bool IsNonPlayerMechPawn(Pawn pawn)
+        {
+            if (pawn == null || pawn.Destroyed || pawn.Dead)
+            {
+                return false;
+            }
+
+            if (pawn.Faction == Faction.OfPlayer)
+            {
+                return false;
+            }
+
+            return pawn.RaceProps != null && pawn.RaceProps.IsMechanoid;
+        }
+
+        internal static bool IsHostileMechBuilding(Building building)
+        {
+            if (building == null || building.Destroyed)
+            {
+                return false;
+            }
+
+            if (building.Faction == Faction.OfPlayer)
+            {
+                return false;
+            }
+
+            if (IsMechanoidFaction(building.Faction) || IsHostileToPlayer(building.Faction))
+            {
+                return true;
+            }
+
+            var defName = building.def != null ? building.def.defName : null;
+            if (string.IsNullOrEmpty(defName))
+            {
+                return false;
+            }
+
+            var lower = defName.ToLowerInvariant();
+            return lower.Contains("mechcluster")
+                || lower.Contains("mech")
+                || lower.Contains("defoliator")
+                || lower.Contains("psychicdrone")
+                || lower.Contains("smokepop")
+                || lower.Contains("assembler")
+                || lower.Contains("turret");
+        }
+
+        internal static bool IsLikelyMechIncident(IncidentDef def)
+        {
+            if (def == null)
+            {
+                return false;
+            }
+
+            if (def == IncidentDefOf.MechCluster)
+            {
+                return true;
+            }
+
+            var name = def.defName;
+            if (string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
+            return name.IndexOf("mech", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        internal static int RemoveLiveMechs()
+        {
+            if (Current.Game == null)
+            {
+                return 0;
+            }
+
+            var removed = 0;
+
+            foreach (var map in Find.Maps)
+            {
+                var pawns = map.mapPawns.AllPawnsSpawned.ToList();
+                foreach (var pawn in pawns)
+                {
+                    if (!IsNonPlayerMechPawn(pawn))
+                    {
+                        continue;
+                    }
+
+                    pawn.Destroy(DestroyMode.Vanish);
+                    removed++;
+                }
+
+                var buildings = map.listerBuildings.allBuildingsColonist
+                    .Concat(map.listerBuildings.allBuildingsNonColonist)
+                    .Distinct()
+                    .ToList();
+
+                foreach (var building in buildings)
+                {
+                    if (!IsHostileMechBuilding(building))
+                    {
+                        continue;
+                    }
+
+                    building.Destroy(DestroyMode.Vanish);
+                    removed++;
+                }
+            }
+
+            return removed;
+        }
+
+        internal static int ApplyEasierMechanoidState()
+        {
+            if (Current.Game == null)
+            {
+                return 0;
+            }
+
+            var affected = CountLiveMechTargets();
+            Component?.RequestApply();
+            return affected;
+        }
+
+        internal static void ApplyEasierMechanoidStateNow()
+        {
+            if (Current.Game == null)
+            {
+                return;
+            }
+
+            foreach (var map in Find.Maps)
+            {
+                var pawns = map.mapPawns.AllPawnsSpawned.ToList();
+                foreach (var pawn in pawns)
+                {
+                    if (!IsNonPlayerMechPawn(pawn))
+                    {
+                        continue;
+                    }
+
+                    WeakenMechPawnStep(pawn);
+                }
+
+                var buildings = map.listerBuildings.allBuildingsColonist
+                    .Concat(map.listerBuildings.allBuildingsNonColonist)
+                    .Distinct()
+                    .ToList();
+
+                foreach (var building in buildings)
+                {
+                    if (!IsHostileMechBuilding(building))
+                    {
+                        continue;
+                    }
+
+                    ClampThingHitPoints(building, MechStructureTargetHitPoints);
+                }
+            }
+        }
+
+        private static int CountLiveMechTargets()
+        {
+            var count = 0;
+
+            foreach (var map in Find.Maps)
+            {
+                count += map.mapPawns.AllPawnsSpawned.Count(IsNonPlayerMechPawn);
+
+                count += map.listerBuildings.allBuildingsColonist
+                    .Concat(map.listerBuildings.allBuildingsNonColonist)
+                    .Distinct()
+                    .Count(IsHostileMechBuilding);
+            }
+
+            return count;
+        }
+
+        private static void WeakenMechPawnStep(Pawn pawn)
+        {
+            if (pawn == null || pawn.Dead || pawn.Destroyed || !pawn.Spawned || pawn.health == null)
+            {
+                return;
+            }
+
+            float damage = 10f;
+
+            if (pawn.kindDef != null)
+            {
+                if (pawn.kindDef.combatPower >= 400f)
+                {
+                    damage = 18f;
+                }
+                else if (pawn.kindDef.combatPower >= 200f)
+                {
+                    damage = 14f;
+                }
+            }
+
+            try
+            {
+                pawn.TakeDamage(new DamageInfo(
+                    DamageDefOf.Bullet,
+                    damage,
+                    999f,
+                    -1f,
+                    null,
+                    null,
+                    null,
+                    DamageInfo.SourceCategory.ThingOrUnknown,
+                    null));
+            }
+            catch
+            {
+            }
+        }
+
+        private static void ClampThingHitPoints(Thing thing, int targetHitPoints)
+        {
+            if (thing == null || thing.Destroyed || !thing.def.useHitPoints)
+            {
+                return;
+            }
+
+            var target = Math.Min(targetHitPoints, thing.MaxHitPoints);
+            if (target < 1)
+            {
+                target = 1;
+            }
+
+            if (thing.HitPoints > target)
+            {
+                thing.HitPoints = target;
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(IncidentWorker_RaidEnemy), "TryExecuteWorker")]
     public static class IncidentWorker_RaidEnemy_TryExecuteWorker_Patch
     {
         static bool Prefix(ref bool __result, IncidentParms parms)
         {
-            var settings = LoadedModManager.GetMod<MechanoidManagerMod>().GetSettings<MechanoidManagerSettings>();
+            var settings = MechanoidManagerRuntime.Settings;
+            if (settings == null)
+            {
+                return true;
+            }
 
-            // Check if mechanoids are disabled
-            if (settings.disableMechanoids && parms.faction != null && parms.faction.def.defName == "Mechanoid")
+            if (settings.disableMechanoids && MechanoidManagerRuntime.IsMechanoidFaction(parms.faction))
             {
                 __result = false;
                 return false;
@@ -36,11 +347,14 @@ namespace MechanoidManager
     [HarmonyPatch(typeof(IncidentWorker_MechCluster), "TryExecuteWorker")]
     public static class IncidentWorker_MechCluster_TryExecuteWorker_Patch
     {
-        static bool Prefix(ref bool __result, IncidentParms parms)
+        static bool Prefix(ref bool __result)
         {
-            var settings = LoadedModManager.GetMod<MechanoidManagerMod>().GetSettings<MechanoidManagerSettings>();
+            var settings = MechanoidManagerRuntime.Settings;
+            if (settings == null)
+            {
+                return true;
+            }
 
-            // Check if mechanoids are disabled
             if (settings.disableMechanoids)
             {
                 __result = false;
@@ -54,11 +368,15 @@ namespace MechanoidManager
     [HarmonyPatch(typeof(StorytellerComp), "IncidentChanceFinal")]
     public static class StorytellerComp_IncidentChanceFinal_Patch
     {
-        static void Postfix(ref float __result, IIncidentTarget target, IncidentDef def)
+        static void Postfix(ref float __result, IncidentDef def)
         {
-            var settings = LoadedModManager.GetMod<MechanoidManagerMod>().GetSettings<MechanoidManagerSettings>();
+            var settings = MechanoidManagerRuntime.Settings;
+            if (settings == null)
+            {
+                return;
+            }
 
-            if (def == IncidentDefOf.MechCluster)
+            if (MechanoidManagerRuntime.IsLikelyMechIncident(def))
             {
                 __result *= settings.mechanoidFrequency;
             }
@@ -70,90 +388,41 @@ namespace MechanoidManager
     {
         static void Prefix(Pawn __instance, ref DamageInfo dinfo)
         {
-            var settings = LoadedModManager.GetMod<MechanoidManagerMod>().GetSettings<MechanoidManagerSettings>();
-
-            if (settings.easierMechanoids && __instance.RaceProps.IsMechanoid)
+            var settings = MechanoidManagerRuntime.Settings;
+            if (settings == null || !settings.easierMechanoids)
             {
-                dinfo.SetAmount(dinfo.Amount - 2); // Reduce damage by 2
+                return;
             }
+
+            if (!MechanoidManagerRuntime.IsNonPlayerMechPawn(__instance))
+            {
+                return;
+            }
+
+            dinfo.SetAmount(dinfo.Amount * MechanoidManagerRuntime.EasierMechDamageMultiplier);
         }
     }
 
-    [HarmonyPatch(typeof(ThingDef), "ResolveReferences")]
-    public static class ThingDef_ResolveReferences_Patch
+    [HarmonyPatch(typeof(Thing), "SpawnSetup")]
+    public static class Thing_SpawnSetup_Patch
     {
-        static void Postfix(ThingDef __instance)
+        static void Postfix(Thing __instance)
         {
-            var settings = LoadedModManager.GetMod<MechanoidManagerMod>().GetSettings<MechanoidManagerSettings>();
-
-            if (settings.easierMechanoids && __instance.race != null && __instance.race.IsMechanoid)
+            var settings = MechanoidManagerRuntime.Settings;
+            if (settings == null || !settings.easierMechanoids || Current.Game == null)
             {
-                var health = __instance.statBases.FirstOrDefault(s => s.stat == StatDefOf.MaxHitPoints);
-                if (health != null)
-                {
-                    health.value -= 2; // Reduce health
-                }
-
-                var sharpArmor = __instance.statBases.FirstOrDefault(s => s.stat == StatDefOf.ArmorRating_Sharp);
-                if (sharpArmor != null)
-                {
-                    sharpArmor.value -= 2; // Reduce sharp armor
-                }
-
-                var bluntArmor = __instance.statBases.FirstOrDefault(s => s.stat == StatDefOf.ArmorRating_Blunt);
-                if (bluntArmor != null)
-                {
-                    bluntArmor.value -= 2; // Reduce blunt armor
-                }
-
-                var meleeDamage = __instance.statBases.FirstOrDefault(s => s.stat == StatDefOf.MeleeWeapon_DamageMultiplier);
-                if (meleeDamage != null)
-                {
-                    meleeDamage.value -= 2; // Reduce melee damage
-                }
-
-                var meleeCooldown = __instance.statBases.FirstOrDefault(s => s.stat == StatDefOf.MeleeWeapon_CooldownMultiplier);
-                if (meleeCooldown != null)
-                {
-                    meleeCooldown.value += 2; // Increase cooldown
-                }
-
-                var flammability = __instance.statBases.FirstOrDefault(s => s.stat == StatDefOf.Flammability);
-                if (flammability != null)
-                {
-                    flammability.value = 1.0f; // Make mechanoids flammable
-                }
-                else
-                {
-                    __instance.statBases.Add(new StatModifier { stat = StatDefOf.Flammability, value = 1.0f });
-                }
-
-                if (__instance.building != null && __instance.building.turretGunDef != null)
-                {
-                    var range = __instance.building.turretGunDef.statBases.FirstOrDefault(s => s.stat == StatDefOf.RangedWeapon_Cooldown);
-                    if (range != null)
-                    {
-                        range.value -= 2; // Reduce turret range
-                    }
-                }
+                return;
             }
-        }
-    }
 
-    [HarmonyPatch(typeof(Building), "SpawnSetup")]
-    public static class Building_SpawnSetup_Patch
-    {
-        static void Postfix(Building __instance, Map map)
-        {
-            var settings = LoadedModManager.GetMod<MechanoidManagerMod>().GetSettings<MechanoidManagerSettings>();
-
-            if (settings.easierMechanoids && __instance.Faction != null && __instance.Faction.def.defName == "Mechanoid")
+            if (__instance is Pawn pawn && MechanoidManagerRuntime.IsNonPlayerMechPawn(pawn))
             {
-                var shield = __instance.def.statBases.FirstOrDefault(s => s.stat == StatDefOf.RangedWeapon_Cooldown);
-                if (shield != null)
-                {
-                    shield.value -= 2; // Reduce shield range
-                }
+                Current.Game.GetComponent<MechanoidManagerGameComponent>()?.RequestApply();
+                return;
+            }
+
+            if (__instance is Building building && MechanoidManagerRuntime.IsHostileMechBuilding(building))
+            {
+                Current.Game.GetComponent<MechanoidManagerGameComponent>()?.RequestApply();
             }
         }
     }
